@@ -7,151 +7,79 @@ on:
     branches: [ main ]
 
 env:
-<<<<<<< HEAD
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-=======
   REGISTRY: docker.io
   IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/wisecow-app
->>>>>>> 6c61eb4 (change in workflow)
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    permissions:
-      contents: read
-      packages: write
-
-=======
->>>>>>> 6c61eb4 (change in workflow)
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # -------------------
+      # CI: Build & Push
+      # -------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-<<<<<<< HEAD
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-=======
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
->>>>>>> 6c61eb4 (change in workflow)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-<<<<<<< HEAD
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  deploy-to-k8s:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      # -------------------
+      # CD: Deploy to K8s
+      # -------------------
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
 
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
+      - name: Configure kubectl
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info
 
-    - name: Check if KUBE_CONFIG secret exists
-      id: check-kubeconfig
-      run: |
-        if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-          echo "kubeconfig-exists=true" >> $GITHUB_OUTPUT
-        else
-          echo "kubeconfig-exists=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Update image in deployment
+        run: |
+          sed -i "s|image:.*|image: docker.io/${{ secrets.DOCKER_USERNAME }}/wisecow-app:${{ github.sha }}|g" k8s/deployment.yaml
 
-    - name: Configure kubectl (if secret exists)
-      if: steps.check-kubeconfig.outputs.kubeconfig-exists == 'true'
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-        chmod 600 ~/.kube/config
-        
-        # Verify kubeconfig content
-        echo "Kubeconfig content:"
-        cat ~/.kube/config | head -10
-        
-        # Test kubectl connection
-        kubectl cluster-info || echo "Failed to connect to cluster"
-        
-        # Verify current context
-        kubectl config current-context
+      - name: Deploy to Kubernetes
+        run: |
+          echo "🚀 Deploying to Kubernetes..."
+          kubectl apply -f k8s/namespace.yaml || true
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl rollout status deployment/wisecow-deployment -n wisecow --timeout=120s
 
-    - name: Update image in deployment
-      run: |
-        # Update the image tag in deployment.yaml
-        sed -i "s|image: ghcr.io/anupsharma/wisecow-app:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g" k8s/deployment.yaml
-
-    - name: Deploy to Kubernetes (if kubeconfig exists)
-      if: steps.check-kubeconfig.outputs.kubeconfig-exists == 'true'
-      run: |
-        echo " Deploying to Kubernetes..."
-        kubectl apply -f k8s/namespace.yaml --validate=false || echo "Namespace already exists"
-        kubectl apply -f k8s/configmap.yaml --validate=false
-        kubectl apply -f k8s/cluster-issuer.yaml --validate=false || echo "ClusterIssuer skipped (cert-manager not installed)"
-        kubectl apply -f k8s/deployment.yaml --validate=false
-        kubectl apply -f k8s/service.yaml --validate=false
-        kubectl apply -f k8s/ingress.yaml --validate=false || echo "Ingress skipped (cert-manager not installed)"
-        kubectl apply -f k8s/certificate.yaml --validate=false || echo "Certificate skipped (cert-manager not installed)"
-        kubectl rollout status deployment/wisecow-deployment -n wisecow --timeout=120s || echo "Deployment status check failed"
-
-    - name: Verify deployment (if kubeconfig exists)
-      if: steps.check-kubeconfig.outputs.kubeconfig-exists == 'true'
-      run: |
-        echo " Deployment Status:"
-        kubectl get pods -n wisecow || echo "Failed to get pods"
-        kubectl get services -n wisecow || echo "Failed to get services"
-        kubectl get ingress -n wisecow || echo "Failed to get ingress"
-
-    - name: Skip deployment (no kubeconfig)
-      if: steps.check-kubeconfig.outputs.kubeconfig-exists == 'false'
-      run: |
-        echo " KUBE_CONFIG secret not found. Skipping Kubernetes deployment."
-        echo " To enable deployment:"
-        echo "1. Create a KUBE_CONFIG secret in your repository"
-        echo "2. Add your base64-encoded kubeconfig file as the secret value"
-        echo "3. Push changes to trigger deployment"
-        echo " Docker image successfully built and pushed to registry"
-
-    - name: Deployment Summary
-      run: |
-        echo " CI/CD Pipeline Complete!"
-        echo " Docker image built and pushed to GitHub Container Registry"
-        echo " Kubernetes manifests ready for deployment"
-        echo " TLS configuration prepared"
-        echo " Manual deployment: kubectl apply -f k8s/"
-        echo " Access locally: kubectl port-forward service/wisecow-service 8080:80 -n wisecow"
-=======
->>>>>>> 6c61eb4 (change in workflow)
+      - name: Verify Deployment
+        run: |
+          echo "📌 Deployment Status:"
+          kubectl get pods -n wisecow
+          kubectl get svc -n wisecow
