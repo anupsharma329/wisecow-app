@@ -51,49 +51,16 @@ jobs:
           cache-to: type=gha,mode=max
 
       # -------------------
-      # CD: Deploy to K8s
+      # CD: Update and Prepare
       # -------------------
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
-      - name: Configure kubectl
-        run: |
-          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-            echo "🔧 Configuring kubectl with cluster config..."
-            mkdir -p ~/.kube
-            echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-            chmod 600 ~/.kube/config
-            kubectl cluster-info || echo "⚠️  Could not connect to cluster"
-          else
-            echo "⚠️  KUBE_CONFIG secret not configured - skipping kubectl setup"
-          fi
-
       - name: Update image in deployment
         run: |
           sed -i "s|image:.*|image: docker.io/${{ secrets.DOCKER_USERNAME }}/wisecow-app:${{ github.sha }}|g" k8s/deployment.yaml
+          echo "✅ Updated deployment.yaml with new image tag"
 
-      - name: Deploy to Kubernetes
+      - name: Build Complete
         run: |
-          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-            echo "🚀 Deploying to Kubernetes..."
-            kubectl apply -f k8s/namespace.yaml || true
-            kubectl apply -f k8s/configmap.yaml
-            kubectl apply -f k8s/deployment.yaml
-            kubectl apply -f k8s/service.yaml
-            kubectl rollout status deployment/wisecow-deployment -n wisecow --timeout=120s || echo "⚠️  Deployment failed or timed out"
-          else
-            echo "⚠️  Skipping Kubernetes deployment - KUBE_CONFIG secret not configured"
-            echo "📝 To enable Kubernetes deployment, add your cluster config as KUBE_CONFIG secret"
-          fi
-
-      - name: Verify Deployment
-        run: |
-          if [ -n "${{ secrets.KUBE_CONFIG }}" ]; then
-            echo "📌 Deployment Status:"
-            kubectl get pods -n wisecow || echo "⚠️  Could not get pods"
-            kubectl get svc -n wisecow || echo "⚠️  Could not get services"
-          else
-            echo "⚠️  Skipping verification - KUBE_CONFIG secret not configured"
-          fi 
+          echo "✅ Docker image built and pushed successfully!"
+          echo "📦 Image: docker.io/${{ secrets.DOCKER_USERNAME }}/wisecow-app:${{ github.sha }}"
+          echo "📝 Deployment file updated with new image tag"
+          echo "🔧 For local deployment: kubectl apply -f k8s/" 
