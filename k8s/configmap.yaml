@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wisecow-config
+  namespace: wisecow
+data:
+  SRVPORT: "4499"
+  RSPFILE: "response"

@@ -1,0 +1,44 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+TLS_SETUP.md
+
+# Kubernetes manifests
+k8s/
+
+# GitHub Actions
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test files
+test/
+tests/
+*_test.sh
