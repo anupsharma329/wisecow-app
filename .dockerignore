@@ -42,3 +42,9 @@ temp/
 test/
 tests/
 *_test.sh
+
+# Local certificates
+certs/
+*.crt
+*.key
+*.csr
