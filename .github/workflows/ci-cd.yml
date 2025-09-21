@@ -7,16 +7,24 @@ on:
     branches: [ main ]
 
 env:
+<<<<<<< HEAD
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+=======
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKER_USERNAME }}/wisecow-app
+>>>>>>> 6c61eb4 (change in workflow)
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+<<<<<<< HEAD
     permissions:
       contents: read
       packages: write
 
+=======
+>>>>>>> 6c61eb4 (change in workflow)
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -24,12 +32,20 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+<<<<<<< HEAD
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+=======
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+>>>>>>> 6c61eb4 (change in workflow)
 
     - name: Extract metadata
       id: meta
@@ -51,6 +67,7 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+<<<<<<< HEAD
 
   deploy-to-k8s:
     needs: build-and-push
@@ -136,3 +153,5 @@ jobs:
         echo " TLS configuration prepared"
         echo " Manual deployment: kubectl apply -f k8s/"
         echo " Access locally: kubectl port-forward service/wisecow-service 8080:80 -n wisecow"
+=======
+>>>>>>> 6c61eb4 (change in workflow)

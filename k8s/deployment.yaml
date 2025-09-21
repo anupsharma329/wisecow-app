@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: wisecow
-        image: ghcr.io/anupsharma/wisecow-app:latest
+        image: anupsharma329/wisecow-app:g1.1
         imagePullPolicy: Always
         ports:
         - containerPort: 4499
