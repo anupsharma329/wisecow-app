@@ -82,4 +82,4 @@ jobs:
         run: |
           echo "📌 Deployment Status:"
           kubectl get pods -n wisecow
-          kubectl get svc -n wisecow
+          kubectl get svc -n wisecow 
