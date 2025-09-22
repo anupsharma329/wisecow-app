@@ -1,0 +1,116 @@
+name: CI - Build and Push Docker, Update K8s Manifests
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - 'CI_CD_GUIDE.md'
+      - 'DEPLOYMENT_GUIDE.md'
+      - 'TLS_SETUP*.md'
+  workflow_dispatch:
+    inputs:
+      use_kubeconfig:
+        description: "Directly deploy to cluster using kubeconfig (overrides Argo CD)"
+        type: boolean
+        required: false
+        default: false
+      kube_namespace:
+        description: "Kubernetes namespace for direct deploy"
+        type: string
+        required: false
+        default: "wisecow"
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: anupsharma329/wisecow-app
+  USE_KUBECONFIG: ${{ github.event.inputs.use_kubeconfig || 'false' }}
+  KUBE_NAMESPACE: ${{ github.event.inputs.kube_namespace || 'wisecow' }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: meta
+        run: |
+          SHA_SHORT=${GITHUB_SHA::7}
+          DATE_TAG=$(date -u +"%Y%m%d-%H%M%S")
+          echo "tag=${DATE_TAG}-${SHA_SHORT}" >> $GITHUB_OUTPUT
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Update k8s deployment image tag
+        run: |
+          FILE="k8s/deployment.yaml"
+          IMAGE_LINE_PREFIX="        image: "
+          NEW_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
+          # Replace the image value in the deployment manifest
+          sed -i.bak "s|^${IMAGE_LINE_PREFIX}.*|${IMAGE_LINE_PREFIX}${NEW_IMAGE}|" "$FILE"
+          rm -f "${FILE}.bak"
+          echo "Updated image to: ${NEW_IMAGE}"
+
+      - name: Commit and push manifest update
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add k8s/deployment.yaml
+          git commit -m "ci: update image tag to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}"
+          git push
+
+
+  deploy-with-kubeconfig:
+    name: Optional Direct Deploy (kubeconfig)
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.use_kubeconfig == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Write kubeconfig from secret
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBECONFIG_B64" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+          echo "Kubeconfig written"
+
+      - name: Set namespace
+        run: |
+          kubectl config set-context --current --namespace="${{ env.KUBE_NAMESPACE }}"
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/
+
+
