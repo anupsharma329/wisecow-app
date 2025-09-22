@@ -12,6 +12,9 @@ A containerized web application that serves random wisdom quotes using `fortune`
 - [Deployment Options](#deployment-options)
 - [TLS Configuration](#tls-configuration)
 - [CI/CD Pipeline](#cicd-pipeline)
+  - [Argo CD (GitOps)](#argo-cd-gitops)
+  - [Direct deploy with kubeconfig (optional)](#direct-deploy-with-kubeconfig-optional)
+  - [Semantic version releases](#semantic-version-releases)
 - [Monitoring](#monitoring)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -38,22 +41,25 @@ Wisecow is a simple HTTP server that:
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Ingress       │────│   LoadBalancer   │────│   NodePort      │
-│   (TLS/HTTP)    │    │   Service        │    │   Service       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │   ClusterIP     │
-                    │   Service       │
-                    └─────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │   Deployment    │
-                    │   (3 replicas)  │
-                    └─────────────────┘
+Client (Browser/curl)
+        │  HTTPS (TLS) / HTTP
+        ▼
+┌──────────────────────────┐
+│ Ingress (nginx, optional)│  ← TLS terminates here (wisecow-tls)
+└─────────────┬────────────┘
+              │ routes host/path
+              ▼
+┌──────────────────────────┐
+│ Service                  │  ← One of: ClusterIP (default inside cluster),
+│  - ClusterIP / NodePort  │            NodePort (minikube access),
+│  - LoadBalancer (tunnel) │            LoadBalancer (via minikube tunnel)
+└─────────────┬────────────┘
+              │ selects app=wisecow
+              ▼
+┌──────────────────────────┐
+│ Deployment (3 replicas)  │  ← Pods listen on 4499
+│  Pods: wisecow containers│
+└──────────────────────────┘
 ```
 
 ## 📋 Prerequisites
@@ -73,6 +79,7 @@ apk add fortune cowsay
 ### Kubernetes Deployment
 - Kubernetes cluster (minikube, kind, or cloud provider)
 - kubectl configured
+- Argo CD installed (recommended for CD)
 - Docker Hub account (for CI/CD)
 
 ### TLS Setup (Optional)
@@ -111,11 +118,15 @@ docker run -p 4499:4499 wisecow-app
 # Start minikube
 minikube start
 
-# Deploy application
-kubectl apply -f k8s/
+# Install Argo CD (one-time)
+kubectl create namespace argocd 2>/dev/null || true
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-# Get service URL
-minikube service wisecow-service-nodeport -n wisecow --url
+# Create Argo CD Application (points to k8s/)
+kubectl apply -f k8s/argocd-application.yaml
+
+# Sync once (or wait for auto-sync)
+argocd app sync wisecow || true
 ```
 
 ## 🚀 Deployment Options
@@ -125,7 +136,7 @@ minikube service wisecow-service-nodeport -n wisecow --url
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/configmap.yaml
 kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/service-nodeport.yaml
 ```
 
 ### Option 2: Using Kustomize
@@ -146,9 +157,9 @@ kubectl apply -f k8s/certificate.yaml
 ## 🔒 TLS Configuration
 
 ### Prerequisites
-1. Install cert-manager in your cluster
-2. Configure DNS for your domain
-3. Update ingress.yaml with your domain
+1. For local Minikube: use a local TLS secret (mkcert/self-signed)
+2. For public cloud: install cert-manager and point DNS to your ingress
+3. Update ingress.yaml hosts to match your domain/host
 
 ### Setup Steps
 1. **Install cert-manager**:
@@ -161,7 +172,7 @@ kubectl apply -f k8s/certificate.yaml
    kubectl apply -f k8s/cluster-issuer.yaml
    ```
 
-3. **Update domain in ingress.yaml**:
+3. **Update domain/host in ingress.yaml**:
    ```yaml
    spec:
      tls:
@@ -176,29 +187,64 @@ kubectl apply -f k8s/certificate.yaml
    kubectl apply -f k8s/certificate.yaml
    ```
 
+### TLS for local Minikube (mkcert)
+```bash
+brew install mkcert nss  # macOS
+mkcert -install
+mkcert wisecow.local
+kubectl -n wisecow create secret tls wisecow-tls \
+  --cert=wisecow.local.pem --key=wisecow.local-key.pem \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "$(minikube ip) wisecow.local" | sudo tee -a /etc/hosts
+curl -vk https://wisecow.local/
+```
+
 ## 🚀 CI/CD Pipeline
 
 ### GitHub Actions Setup
 
 1. **Configure Secrets** in GitHub repository:
-   - `DOCKER_USERNAME`: Your Docker Hub username
-   - `DOCKER_PASSWORD`: Your Docker Hub password/token
+   - `DOCKERHUB_USERNAME`: Your Docker Hub username
+   - `DOCKERHUB_TOKEN`: Your Docker Hub access token
+   - Optional (only for manual kubeconfig deploy): `KUBECONFIG_B64`
 
 2. **Pipeline Features**:
    - ✅ Automatic build on push to main
-   - ✅ Docker image build and push
-   - ✅ Multi-architecture support
-   - ✅ Image caching for faster builds
-   - ✅ Deployment file updates
+   - ✅ Docker image build and push (multi-arch: amd64+arm64)
+   - ✅ Updates `k8s/deployment.yaml` with the new image tag
+   - ✅ Argo CD auto-sync deploys changes (GitOps)
+   - ✅ Optional manual direct deploy with kubeconfig
 
-### Manual Deployment
-After CI/CD builds the image:
+### Argo CD (GitOps)
+- App manifest: `k8s/argocd-application.yaml` (auto-sync, self-heal, kustomize)
+- Default flow: CI commits a new image tag to `k8s/deployment.yaml` → Argo CD detects Git change → deploys
+
+### Direct deploy with kubeconfig (optional)
+- Workflow dispatch input `use_kubeconfig=true` writes `KUBECONFIG_B64` and runs `kubectl apply -f k8s/`.
+- Use only when Argo CD is unavailable; GitOps is preferred.
+
+### Semantic version releases
+- Push a Git tag `vX.Y.Z` to publish `:vX.Y.Z` and `:latest`, and write that tag into `k8s/deployment.yaml`.
 ```bash
-# Update deployment with new image
-kubectl set image deployment/wisecow-deployment wisecow=your-username/wisecow-app:latest -n wisecow
+git tag v1.0.0
+git push origin v1.0.0
+```
 
-# Or apply the updated deployment file
-kubectl apply -f k8s/deployment.yaml
+### Accessing the app locally
+- Exact LAN port 4499 on your Mac (recommended):
+```bash
+kubectl -n wisecow port-forward --address 0.0.0.0 svc/wisecow-service-nodeport 4499:4499
+open http://127.0.0.1:4499/
+```
+- Via NodePort on Minikube VM (may not be reachable on macOS LAN):
+```bash
+minikube ip; kubectl -n wisecow get svc wisecow-service-nodeport
+curl http://$(minikube ip):<nodePort>/
+```
+- Via LoadBalancer using tunnel:
+```bash
+sudo minikube tunnel --bind-address=0.0.0.0 --cleanup
+kubectl -n wisecow get svc wisecow-service-loadbalancer -o wide
 ```
 
 ## 📊 Monitoring
@@ -297,12 +343,12 @@ kubectl logs -f deployment/wisecow-deployment -n wisecow
 wisecow-app/
 ├── .github/
 │   └── workflows/
-│       └── ci-cd.yml              # GitHub Actions pipeline
+│       └── ci-cd.yaml             # GitHub Actions pipeline
 ├── k8s/                           # Kubernetes manifests
 │   ├── namespace.yaml             # Namespace definition
 │   ├── configmap.yaml             # Configuration
 │   ├── deployment.yaml            # Application deployment
-│   ├── service.yaml               # ClusterIP service
+│   ├── service.yaml               # ClusterIP service (not used by default)
 │   ├── service-nodeport.yaml      # NodePort service
 │   ├── service-loadbalancer.yaml  # LoadBalancer service
 │   ├── ingress.yaml               # Ingress with TLS
