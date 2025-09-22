@@ -11,8 +11,8 @@ spec:
     repoURL: https://github.com/anupsharma329/wisecow-app.git
     targetRevision: main
     path: k8s
-    directory:
-      recurse: true
+    # Let Argo CD detect and use kustomize (k8s/kustomization.yaml)
+    # Do NOT use directory.recurse to avoid applying resources twice
   destination:
     server: https://kubernetes.default.svc
     namespace: wisecow
