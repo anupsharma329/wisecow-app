@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: wisecow
-        image: docker.io/anupsharma329/wisecow-app:20250924-110735-a793c4f
+        image: docker.io/anupsharma329/wisecow-app:20250924-120207-05a3297
         imagePullPolicy: Always
         ports:
         - containerPort: 4499
