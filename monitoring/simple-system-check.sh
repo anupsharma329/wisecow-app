@@ -12,16 +12,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo "🖥️  Wisecow Simple System Health Checker"
+echo "  Wisecow Simple System Health Checker"
 echo "======================================="
-echo "📅 Started: $(date)"
+echo " Started: $(date)"
 echo ""
 
 # Function to check CPU usage
 check_cpu() {
     local name="CPU"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     # Get system CPU usage
     local cpu_usage=$(top -l 1 | grep "CPU usage" | awk '{print $3}' | sed 's/%//' | cut -d. -f1)
@@ -30,7 +30,7 @@ check_cpu() {
         echo -e "${RED}❌ HIGH${NC} - ${cpu_usage}% (Threshold: 80%)"
         return 1
     else
-        echo -e "${GREEN}✅ OK${NC} - ${cpu_usage}%"
+        echo -e "${GREEN} OK${NC} - ${cpu_usage}%"
         return 0
     fi
 }
@@ -39,7 +39,7 @@ check_cpu() {
 check_memory() {
     local name="Memory"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     # Get memory info using vm_stat
     local pages_free=$(vm_stat | grep "Pages free" | awk '{print $3}' | sed 's/\.//')
@@ -56,7 +56,7 @@ check_memory() {
         echo -e "${RED}❌ HIGH${NC} - ${memory_percentage}% (Threshold: 85%)"
         return 1
     else
-        echo -e "${GREEN}✅ OK${NC} - ${memory_percentage}%"
+        echo -e "${GREEN} OK${NC} - ${memory_percentage}%"
         return 0
     fi
 }
@@ -65,7 +65,7 @@ check_memory() {
 check_disk() {
     local name="Disk"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     # Get disk usage for main volume
     local disk_usage=$(df -h / | tail -1 | awk '{print $5}' | sed 's/%//')
@@ -74,7 +74,7 @@ check_disk() {
         echo -e "${RED}❌ HIGH${NC} - ${disk_usage}% (Threshold: 90%)"
         return 1
     else
-        echo -e "${GREEN}✅ OK${NC} - ${disk_usage}%"
+        echo -e "${GREEN} OK${NC} - ${disk_usage}%"
         return 0
     fi
 }
@@ -83,7 +83,7 @@ check_disk() {
 check_k8s_cluster() {
     local name="K8s-Cluster"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     if ! command -v kubectl &> /dev/null; then
         echo -e "${RED}❌ FAILED${NC} - kubectl not found"
@@ -101,7 +101,7 @@ check_k8s_cluster() {
     local total_nodes=$(kubectl get nodes --no-headers | wc -l || echo "0")
     
     if [[ "$ready_nodes" == "$total_nodes" && "$ready_nodes" != "0" ]]; then
-        echo -e "${GREEN}✅ OK${NC} - All $ready_nodes nodes ready"
+        echo -e "${GREEN} OK${NC} - All $ready_nodes nodes ready"
         return 0
     else
         echo -e "${RED}❌ FAILED${NC} - Only $ready_nodes/$total_nodes nodes ready"
@@ -113,7 +113,7 @@ check_k8s_cluster() {
 check_processes() {
     local name="Processes"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     # Count critical processes
     local docker_processes=$(ps aux | grep -c "[D]ocker" || echo "0")
@@ -124,16 +124,16 @@ check_processes() {
     local issues=0
     
     if [[ "$docker_processes" -eq 0 ]]; then
-        echo -e "${YELLOW}⚠️  WARN${NC} - No Docker processes found"
+        echo -e "${YELLOW}  WARN${NC} - No Docker processes found"
         return 1
     fi
     
     if [[ "$minikube_processes" -eq 0 ]]; then
-        echo -e "${YELLOW}⚠️  WARN${NC} - No Minikube processes found"
+        echo -e "${YELLOW}  WARN${NC} - No Minikube processes found"
         return 1
     fi
     
-    echo -e "${GREEN}✅ OK${NC} - Docker: $docker_processes, Minikube: $minikube_processes, kubectl: $kubectl_processes"
+    echo -e "${GREEN} OK${NC} - Docker: $docker_processes, Minikube: $minikube_processes, kubectl: $kubectl_processes"
     return 0
 }
 
@@ -141,7 +141,7 @@ check_processes() {
 check_network() {
     local name="Network"
     
-    echo -n "🔍 Checking $name... "
+    echo -n " Checking $name... "
     
     # Test local connectivity
     if ping -c 1 127.0.0.1 &> /dev/null; then
@@ -169,10 +169,10 @@ check_network() {
     fi
     
     if [[ "$local_ping" == "OK" && "$external_ping" == "OK" ]]; then
-        echo -e "${GREEN}✅ OK${NC} - Local: $local_ping, External: $external_ping, Minikube: $minikube_ping ($minikube_ip)"
+        echo -e "${GREEN} OK${NC} - Local: $local_ping, External: $external_ping, Minikube: $minikube_ping ($minikube_ip)"
         return 0
     else
-        echo -e "${RED}❌ FAILED${NC} - Local: $local_ping, External: $external_ping, Minikube: $minikube_ping"
+        echo -e "${RED} FAILED${NC} - Local: $local_ping, External: $external_ping, Minikube: $minikube_ping"
         return 1
     fi
 }
@@ -223,47 +223,47 @@ fi
 
 # Generate summary
 echo ""
-echo "📊 System Health Summary"
+echo " System Health Summary"
 echo "======================="
-echo "✅ Passed: $passed/$total"
+echo " Passed: $passed/$total"
 
 health_percentage=$((passed * 100 / total))
-echo "📈 Health: $health_percentage%"
+echo " Health: $health_percentage%"
 
 if [[ $health_percentage -ge 85 ]]; then
-    echo -e "  ${GREEN}🟢 Status: EXCELLENT${NC}"
+    echo -e "  ${GREEN} Status: EXCELLENT${NC}"
 elif [[ $health_percentage -ge 70 ]]; then
-    echo -e "  ${YELLOW}🟡 Status: GOOD${NC}"
+    echo -e "  ${YELLOW} Status: GOOD${NC}"
 else
-    echo -e "  ${RED}🔴 Status: NEEDS ATTENTION${NC}"
+    echo -e "  ${RED} Status: NEEDS ATTENTION${NC}"
 fi
 
 # Show resource details
 echo ""
-echo "📋 Resource Details"
+echo " Resource Details"
 echo "=================="
 
 # CPU details
 cpu_info=$(top -l 1 | grep "CPU usage")
-echo "🖥️  CPU: $cpu_info"
+echo "  CPU: $cpu_info"
 
 # Memory details
 mem_info=$(vm_stat | grep -E "(Pages free|Pages active)")
-echo "💾 Memory: $(echo "$mem_info" | tr '\n' ' ')"
+echo " Memory: $(echo "$mem_info" | tr '\n' ' ')"
 
 # Disk details
 disk_info=$(df -h / | tail -1)
-echo "💿 Disk: $disk_info"
+echo " Disk: $disk_info"
 
 # Minikube status
 if command -v minikube &> /dev/null; then
-    echo "🐳 Minikube: $(minikube status --format '{{.Host}} {{.Kubelet}} {{.APIServer}}')"
+    echo " Minikube: $(minikube status --format '{{.Host}} {{.Kubelet}} {{.APIServer}}')"
 fi
 
 echo ""
-echo "🎯 Quick Commands:"
-echo "  📊 Pods: kubectl get pods -n wisecow"
-echo "  🔍 Nodes: kubectl get nodes"
-echo "  📈 Resources: kubectl top pods -n wisecow"
+echo " Quick Commands:"
+echo "   Pods: kubectl get pods -n wisecow"
+echo "   Nodes: kubectl get nodes"
+echo "   Resources: kubectl top pods -n wisecow"
 echo ""
-echo "✅ System health check completed!"
+echo " System health check completed!"

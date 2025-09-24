@@ -38,10 +38,10 @@ FAILURE_COUNT_K8S_DEPLOYMENT=0
 FAILURE_COUNT_K8S_SERVICE=0
 FAILURE_COUNT_K8S_PODS=0
 
-echo "🐄 Wisecow Application Health Checker"
+echo " Wisecow Application Health Checker"
 echo "====================================="
-echo "📅 Started: $(date)"
-echo "📝 Log file: $LOG_FILE"
+echo " Started: $(date)"
+echo " Log file: $LOG_FILE"
 echo ""
 
 # Function to log messages
@@ -157,7 +157,7 @@ check_k8s_pods() {
 # Function to generate health report
 generate_report() {
     echo ""
-    echo "📊 Health Check Summary"
+    echo " Health Check Summary"
     echo "======================"
     
     local total_checks=0
@@ -166,10 +166,10 @@ generate_report() {
     for endpoint in "${!ENDPOINTS[@]}"; do
         total_checks=$((total_checks + 1))
         if [[ ${FAILURE_COUNT[$endpoint]} -eq 0 ]]; then
-            echo -e "  ${GREEN}✅${NC} $endpoint: Healthy"
+            echo -e "  ${GREEN}${NC} $endpoint: Healthy"
             passed_checks=$((passed_checks + 1))
         else
-            echo -e "  ${RED}❌${NC} $endpoint: Failed (${FAILURE_COUNT[$endpoint]} consecutive failures)"
+            echo -e "  ${RED}${NC} $endpoint: Failed (${FAILURE_COUNT[$endpoint]} consecutive failures)"
         fi
     done
     
@@ -177,34 +177,34 @@ generate_report() {
     for check in "K8s-Deployment" "K8s-Service" "K8s-Pods"; do
         total_checks=$((total_checks + 1))
         if [[ ${FAILURE_COUNT[$check]} -eq 0 ]]; then
-            echo -e "  ${GREEN}✅${NC} $check: Healthy"
+            echo -e "  ${GREEN}${NC} $check: Healthy"
             passed_checks=$((passed_checks + 1))
         else
-            echo -e "  ${RED}❌${NC} $check: Failed (${FAILURE_COUNT[$check]} consecutive failures)"
+            echo -e "  ${RED}${NC} $check: Failed (${FAILURE_COUNT[$check]} consecutive failures)"
         fi
     done
     
     local health_percentage=$((passed_checks * 100 / total_checks))
     echo ""
-    echo "📈 Overall Health: $passed_checks/$total_checks ($health_percentage%)"
+    echo " Overall Health: $passed_checks/$total_checks ($health_percentage%)"
     
     if [[ $health_percentage -ge 80 ]]; then
-        echo -e "  ${GREEN}🟢 Status: EXCELLENT${NC}"
+        echo -e "  ${GREEN} Status: EXCELLENT${NC}"
     elif [[ $health_percentage -ge 60 ]]; then
-        echo -e "  ${YELLOW}🟡 Status: GOOD${NC}"
+        echo -e "  ${YELLOW} Status: GOOD${NC}"
     else
-        echo -e "  ${RED}🔴 Status: POOR${NC}"
+        echo -e "  ${RED} Status: POOR${NC}"
     fi
 }
 
 # Main monitoring loop
 monitor_loop() {
-    echo "🔄 Starting continuous monitoring (Press Ctrl+C to stop)"
-    echo "⏰ Check interval: ${CHECK_INTERVAL}s"
+    echo " Starting continuous monitoring (Press Ctrl+C to stop)"
+    echo " Check interval: ${CHECK_INTERVAL}s"
     echo ""
     
     while true; do
-        echo "🔍 Health Check - $(date '+%H:%M:%S')"
+        echo " Health Check - $(date '+%H:%M:%S')"
         echo "----------------------------------------"
         
         # Check HTTP endpoints
@@ -230,11 +230,11 @@ monitor_loop() {
         done
         
         if [[ $critical_failures -gt 0 ]]; then
-            echo -e "${RED}🚨 CRITICAL ALERT: $critical_failures components have critical failures!${NC}"
+            echo -e "${RED} CRITICAL ALERT: $critical_failures components have critical failures!${NC}"
         fi
         
         echo ""
-        echo "⏳ Waiting ${CHECK_INTERVAL}s for next check..."
+        echo " Waiting ${CHECK_INTERVAL}s for next check..."
         echo "================================================"
         sleep $CHECK_INTERVAL
     done
@@ -242,7 +242,7 @@ monitor_loop() {
 
 # Single check mode
 single_check() {
-    echo "🔍 Single Health Check"
+    echo " Single Health Check"
     echo "====================="
     
     # Check HTTP endpoints
@@ -278,11 +278,11 @@ show_usage() {
 # Show recent logs
 show_logs() {
     if [[ -f "$LOG_FILE" ]]; then
-        echo "📋 Recent Health Check Logs"
+        echo " Recent Health Check Logs"
         echo "=========================="
         tail -20 "$LOG_FILE"
     else
-        echo "📋 No log file found at $LOG_FILE"
+        echo " No log file found at $LOG_FILE"
     fi
 }
 

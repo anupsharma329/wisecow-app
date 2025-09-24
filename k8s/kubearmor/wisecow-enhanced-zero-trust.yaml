@@ -1,0 +1,146 @@
+# Enhanced KubeArmor zero-trust policies for the wisecow workload
+# Targets pods with label app=wisecow in namespace wisecow
+# Docs: https://docs.kubearmor.io/kubearmor/
+---
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: ksp-wisecow-block-all-shells
+  namespace: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  process:
+    matchPaths:
+    - path: /bin/sh
+    - path: /usr/bin/sh
+    - path: /bin/bash
+    - path: /usr/bin/bash
+    - path: /bin/dash
+    - path: /usr/bin/dash
+    - path: /bin/ash
+    - path: /usr/bin/ash
+    - path: /bin/zsh
+    - path: /usr/bin/zsh
+    - path: /bin/busybox
+  action: Block
+  severity: 8
+  message: "Block all interactive shells and suspicious binaries in wisecow pods"
+  tags: ["zero-trust", "process", "no-shell"]
+---
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: ksp-wisecow-block-serviceaccount-access
+  namespace: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  file:
+    matchPaths:
+    - path: /var/run/secrets/kubernetes.io/serviceaccount/token
+      readOnly: false
+    - path: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      readOnly: false
+    - path: /var/run/secrets/kubernetes.io/serviceaccount/namespace
+      readOnly: false
+    matchDirectories:
+    - dir: /var/run/secrets/kubernetes.io/serviceaccount/
+      recursive: true
+    - dir: /var/run/secrets/
+      recursive: true
+  action: Block
+  severity: 9
+  message: "Block all access to Kubernetes ServiceAccount credentials and secrets"
+  tags: ["zero-trust", "file", "sa-token", "secrets"]
+---
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: ksp-wisecow-protect-system-dirs
+  namespace: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  file:
+    matchDirectories:
+    - dir: /root/
+      recursive: true
+    - dir: /var/lib/
+      recursive: true
+    - dir: /etc/
+      recursive: true
+    - dir: /sys/
+      recursive: true
+    - dir: /proc/sys/
+      recursive: true
+    - dir: /boot/
+      recursive: true
+  action: Block
+  severity: 7
+  message: "Block access to system and sensitive directories"
+  tags: ["zero-trust", "file", "system-integrity"]
+---
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: ksp-wisecow-block-network-tools
+  namespace: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  process:
+    matchPaths:
+    - path: /usr/bin/wget
+    - path: /usr/bin/curl
+    - path: /usr/bin/ssh
+    - path: /usr/bin/scp
+    - path: /usr/bin/rsync
+  action: Block
+  severity: 6
+  message: "Block network tools that could be used for data exfiltration"
+  tags: ["zero-trust", "process", "network-tools"]
+---
+apiVersion: security.kubearmor.com/v1
+kind: KubeArmorPolicy
+metadata:
+  name: ksp-wisecow-allow-app-processes
+  namespace: wisecow
+spec:
+  selector:
+    matchLabels:
+      app: wisecow
+  process:
+    matchPaths:
+    - path: /usr/games/fortune
+    - path: /usr/games/cowsay
+    - path: /usr/bin/fortune
+    - path: /usr/local/bin/cowsay
+    - path: /usr/bin/perl
+    - path: /bin/nc
+    - path: /usr/bin/nc
+    - path: /bin/ps
+    - path: /usr/bin/ps
+    - path: /bin/ls
+    - path: /usr/bin/ls
+    - path: /bin/cat
+    - path: /usr/bin/cat
+    - path: /bin/echo
+    - path: /usr/bin/echo
+    - path: /usr/bin/whoami
+    - path: /bin/sleep
+    - path: /usr/bin/sleep
+    # Allow BusyBox only when spawned by the app's entrypoint (/bin/bash running /app/wisecow.sh)
+    matchPaths:
+    - path: /bin/busybox
+      fromSource:
+      - path: /bin/bash
+      - path: /app/wisecow.sh
+  action: Allow
+  severity: 1
+  message: "Allow legitimate application processes"
+  tags: ["zero-trust", "process", "allow-list"]

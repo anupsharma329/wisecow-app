@@ -5,14 +5,10 @@ metadata:
   namespace: wisecow
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
   tls:
   - hosts:
-    - wisecow.local
-    - wisecow.example.com
+      - wisecow.local
     secretName: wisecow-tls
   rules:
   - host: wisecow.local
@@ -24,14 +20,4 @@ spec:
           service:
             name: wisecow-service
             port:
-              number: 80
-  - host: wisecow.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: wisecow-service
-            port:
-              number: 80
+              number: 4499   # match your service port
