@@ -3,11 +3,16 @@ kind: Service
 metadata:
   name: wisecow-service
   namespace: wisecow
+  labels:
+    app: wisecow
 spec:
   selector:
     app: wisecow
   ports:
-    - name: http
-      port: 80         # exposed to ingress
-      targetPort: 4499 # pod port
+  - name: http
+    port: 80
+    targetPort: 4499
+    protocol: TCP
   type: ClusterIP
+
+

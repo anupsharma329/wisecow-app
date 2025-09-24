@@ -1,6 +1,3 @@
-# Enhanced KubeArmor zero-trust policies for the wisecow workload
-# Targets pods with label app=wisecow in namespace wisecow
-# Docs: https://docs.kubearmor.io/kubearmor/
 ---
 apiVersion: security.kubearmor.com/v1
 kind: KubeArmorPolicy
