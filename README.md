@@ -1,4 +1,4 @@
-# AccuKnox DevOps Trainee Assessment – Wisecow (Single README)
+# AccuKnox DevOps Trainee Assessment – Wisecow 
 
 This repository demonstrates containerization, Kubernetes deployment, CI/CD, TLS, and zero‑trust runtime hardening (KubeArmor) for the Wisecow app.
 
@@ -30,7 +30,7 @@ minikube service wisecow-service-nodeport -n wisecow --url || \
 - On push to main: builds multi‑arch image, pushes to Docker Hub, updates `k8s/deployment.yaml` image tag.
 - Optional direct deploy supported via workflow inputs.
 
-## TLS (Challenge Goal)
+## TLS 
 ```bash
 # Let’s Encrypt style (production-like)
 kubectl apply -f k8s/cluster-issuer.yaml
